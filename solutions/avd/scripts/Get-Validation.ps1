@@ -19,9 +19,6 @@ param(
     [string]$EphemeralOsDisk,
 
     [parameter(Mandatory)]
-    [string]$FSLogixStorage,
-
-    [parameter(Mandatory)]
     [string]$ImageSku,
 
     [parameter(Mandatory)]
@@ -117,35 +114,6 @@ if($Availability -eq 'AvailabilityZones' -and $Sku.locationInfo.zones.count -lt 
 }
 $DeploymentScriptOutputs["avdObjectId"] = $AvdObjectId #>
 
-
-# Azure NetApp Files Validation & Output
-if($FSLogixStorage -like "AzureNetAppFiles*")
-{
-    $Vnet = Get-AzVirtualNetwork -Name $VnetName -ResourceGroupName $VnetResourceGroupName
-    $DnsServers = "$($Vnet.DhcpOptions.DnsServers[0]),$($Vnet.DhcpOptions.DnsServers[1])"
-    $SubnetId = ($Vnet.Subnets | Where-Object {$_.Delegations[0].ServiceName -eq "Microsoft.NetApp/volumes"}).Id
-    if($null -eq $SubnetId -or $SubnetId -eq '')
-    {
-        Write-Error -Exception 'Invalid Azure NetApp Files Configuration' -Message 'A dedicated subnet must be delegated to the ANF resource provider.'
-    }
-    Install-Module -Name "Az.NetAppFiles" -Force
-    $DeployAnfAd = "true"
-    $Accounts = Get-AzResource -ResourceType "Microsoft.NetApp/netAppAccounts" | Where-Object {$_.Location -eq $Location}
-    foreach($Account in $Accounts)
-    {
-        $AD = Get-AzNetAppFilesActiveDirectory -ResourceGroupName $Account.ResourceGroupName -AccountName $Account.Name
-        if($AD.ActiveDirectoryId){$DeployAnfAd = 'false'}
-    }
-    $DeploymentScriptOutputs["anfDnsServers"] = $DnsServers
-    $DeploymentScriptOutputs["anfSubnetId"] = $SubnetId
-    $DeploymentScriptOutputs["anfActiveDirectory"] = $DeployAnfAd
-}
-else 
-{
-    $DeploymentScriptOutputs["anfDnsServers"] = 'NotApplicable'
-    $DeploymentScriptOutputs["anfSubnetId"] = 'NotApplicable'
-    $DeploymentScriptOutputs["anfActiveDirectory"] = 'false'   
-}
 
 
 # Disk SKU validation
