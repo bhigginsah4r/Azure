@@ -66,16 +66,6 @@ param Environment string = 'd'
 @description('Choose whether the session host uses an ephemeral disk for the operating system.  Be sure to select a VM SKU that offers a temporary disk that meets your image requirements. Reference: https://docs.microsoft.com/en-us/azure/virtual-machines/ephemeral-os-disks')
 param EphemeralOsDisk bool = false
 
-@description('The file share size(s) in GB for the Fslogix storage solution.')
-param FslogixShareSizeInGB int
-
-@allowed([
-  'CloudCache' // FSLogix Cloud Cache
-  'ProfileContainer' // FSLogix Profile Container
-  'ProfileOfficeContainer' // FSLogix Profile & Office Container
-])
-param FslogixSolution string = 'ProfileContainer'
-
 @allowed([
   'AzureNetAppFiles Premium' // ANF with the Premium SKU, 450,000 IOPS
   'AzureNetAppFiles Standard' // ANF with the Standard SKU, 320,000 IOPS
@@ -88,8 +78,6 @@ param FslogixSolution string = 'ProfileContainer'
   'AzureStorageAccount Standard ServiceEndpoint' // Azure Files Standard with the Large File Share option and a Service Endpoint, 20,000 IOPS
   'None'
 ])
-@description('Enable an Fslogix storage option to manage user profiles for the AVD session hosts. The selected service & SKU should provide sufficient IOPS for all of your users. https://docs.microsoft.com/en-us/azure/architecture/example-scenario/wvd/windows-virtual-desktop-fslogix#performance-requirements')
-param FslogixStorage string = 'AzureStorageAccount Standard PublicEndpoint'
 
 @allowed([
   'Pooled DepthFirst'
@@ -184,12 +172,6 @@ param ScreenCaptureProtection bool = false
 @description('The SAS Token for the scripts if they are stored on an Azure Storage Account.')
 param SasToken string = ''
 
-@description('An array of Object IDs for the Security Principals to assign to the AVD Application Group and FSLogix Storage.')
-param SecurityPrincipalObjectIds array
-
-@description('The name for the Security Principal to assign NTFS permissions on the Azure File Share to support Fslogix.  Any value can be input in this field if performing a deployment update or choosing a personal host pool.')
-param SecurityPrincipalNames array
-
 @description('The number of session hosts to deploy in the host pool.  The default values will allow you deploy 250 VMs using 4 nested deployments.  These integers may be modified to create a smaller deployment in a shard.')
 param SessionHostCount int = 2
 
@@ -276,8 +258,6 @@ var FileShareNames = {
     'cloudcache'
   ]
 }
-var FileShares = FileShareNames[FslogixSolution]
-var Fslogix = FslogixStorage == 'None' || contains(DomainServices, 'None') ? false : true
 var HostPoolName = 'hp-${NamingStandard}'
 var KeyVaultName = 'kv-${NamingStandard}'
 var LocationShortName = LocationShortNames[Location]
@@ -345,7 +325,6 @@ var Netbios = split(DomainName, '.')[0]
 var NetworkSecurityGroupName = 'nsg-${NamingStandard}'
 var PooledHostPool = split(HostPoolType, ' ')[0] == 'Pooled' ? true : false
 var PrivateDnsZoneName = 'privatelink.file.${StorageSuffix}'
-var PrivateEndpoint = contains(FslogixStorage, 'PrivateEndpoint') ? true : false
 var RecoveryServicesVaultName = 'rsv-${NamingStandard}'
 var ResourceGroups = [
   'rg-${NamingStandard}-deployment'  
@@ -365,8 +344,6 @@ var RoleDefinitionIds = {
 var ScriptsUri = '${ArtifactsLocation}scripts/'
 var StampIndexFull = padLeft(StampIndex, 2, '0')
 var StorageAccountPrefix = 'st${Identifier}${Environment}${LocationShortName}${StampIndexFull}'
-var StorageSolution = split(FslogixStorage, ' ')[0]
-var StorageSku = FslogixStorage == 'None' ? 'None' : split(FslogixStorage, ' ')[1]
 var StorageSuffix = environment().suffixes.storage
 var TimeZones = {
     australiacentral: 'Australian Eastern Standard Time'
@@ -443,7 +420,6 @@ module managedIdentity 'modules/managedIdentity/managedIdentity.bicep' = {
   name: 'ManagedIdentity_${Timestamp}'
   params: {
     DrainMode: DrainMode
-    FslogixStorage: FslogixStorage
     Location: Location
     ManagedIdentityName: ManagedIdentityName
     ResourceGroups: ResourceGroups
@@ -468,7 +444,6 @@ module validation 'modules/validation.bicep' = {
     DomainName: DomainName
     DomainServices: DomainServices
     EphemeralOsDisk: EphemeralOsDisk
-    FSLogixStorage: FslogixStorage
     ImageSku: ImageSku
     KerberosEncryption: KerberosEncryption
     Location: Location
@@ -594,69 +569,6 @@ module stig 'modules/stig.bicep' = if(DisaStigCompliance) {
   ]
 }
 
-module fslogix 'modules/fslogix/fslogix.bicep' = if(Fslogix) {
-  name: 'FSLogix_${Timestamp}'
-  params: {
-    ActiveDirectoryConnection: validation.outputs.anfActiveDirectory
-    ConfigurationsUri: ConfigurationsUri
-    DelegatedSubnetId: validation.outputs.anfSubnetId
-    DiskEncryption: DiskEncryption
-    DnsServerForwarderIPAddresses: validation.outputs.dnsForwarders
-    DnsServers: validation.outputs.anfDnsServers
-    DnsServerSize: validation.outputs.dnsServerSize
-    DomainJoinPassword: DomainJoinPassword
-    DomainJoinUserPrincipalName: DomainJoinUserPrincipalName
-    DomainName: DomainName
-    DomainServices: DomainServices
-    Environment: Environment
-    FileShares: FileShares
-    FslogixShareSizeInGB: FslogixShareSizeInGB
-    FslogixStorage: FslogixStorage
-    HostPoolName: HostPoolName
-    HybridUseBenefit: HybridUseBenefit
-    Identifier: Identifier
-    KerberosEncryption: KerberosEncryption
-    KeyVaultName: KeyVaultName
-    Location: Location
-    LocationShortName: LocationShortName
-    ManagedIdentityResourceId: managedIdentity.outputs.resourceIdentifier
-    ManagementVmName: ManagementVmName
-    NamingStandard: NamingStandard
-    NetAppAccountName: NetAppAccountName
-    NetAppCapacityPoolName: NetAppCapacityPoolName
-    Netbios: Netbios
-    OuPath: OuPath
-    PrivateDnsZoneName: PrivateDnsZoneName
-    PrivateEndpoint: PrivateEndpoint
-    ResourceGroups: ResourceGroups
-    RoleDefinitionIds: RoleDefinitionIds
-    SasToken: SasToken
-    ScriptsUri: ScriptsUri
-    SecurityPrincipalIds: SecurityPrincipalObjectIds
-    SecurityPrincipalNames: SecurityPrincipalNames
-    SmbServerLocation: LocationShortName
-    StampIndexFull: StampIndexFull
-    StorageAccountPrefix: StorageAccountPrefix
-    StorageCount: StorageCount
-    StorageIndex: StorageIndex
-    StorageSku: StorageSku
-    StorageSolution: StorageSolution
-    StorageSuffix: StorageSuffix
-    Subnet: Subnet
-    Tags: Tags
-    Timestamp: Timestamp
-    VirtualNetwork: VirtualNetwork
-    VirtualNetworkResourceGroup: VirtualNetworkResourceGroup
-    VmPassword: VmPassword
-    VmUsername: VmUsername
-  }
-  dependsOn: [
-    bitLocker
-    managedIdentity
-    stig
-  ]
-}
-
 module sessionHosts 'modules/sessionHosts/sessionHosts.bicep' = {
   name: 'SessionHosts_${Timestamp}'
   scope: resourceGroup(ResourceGroups[1]) // Hosts Resource Group
@@ -677,7 +589,6 @@ module sessionHosts 'modules/sessionHosts/sessionHosts.bicep' = {
     DomainServices: DomainServices
     EphemeralOsDisk: validation.outputs.ephemeralOsDisk
     FileShares: FileShares
-    Fslogix: Fslogix
     HostPoolName: HostPoolName
     HostPoolType: HostPoolType
     ImageOffer: ImageOffer
@@ -726,62 +637,8 @@ module sessionHosts 'modules/sessionHosts/sessionHosts.bicep' = {
   ]
 }
 
-module backup 'modules/backup.bicep' = if(RecoveryServices) {
-  name: 'Backup_${Timestamp}'
-  scope: resourceGroup(ResourceGroups[2]) // Management Resource Group
-  params: {
-    DivisionRemainderValue: DivisionRemainderValue
-    HostPoolName: HostPoolName
-    HostPoolType: HostPoolType
-    Location: Location
-    MaxResourcesPerTemplateDeployment: MaxResourcesPerTemplateDeployment
-    RecoveryServicesVaultName: RecoveryServicesVaultName
-    SessionHostBatchCount: SessionHostBatchCount
-    SessionHostIndex: SessionHostIndex
-    StorageAccountName: StorageAccountPrefix
-    Tags: Tags
-    Timestamp: Timestamp
-    TimeZone: TimeZones[Location]
-    VmName: VmName
-    VmResourceGroupName: ResourceGroups[1]
-  }
-  dependsOn: [
-    sessionHosts
-    fslogix
-  ]
-}
 
-// Deploys scaling for the session hosts and Azure Files Premium, if applicable
-module scale 'modules/scale.bicep' = if(PooledHostPool) {
-  name: 'Scale_${Timestamp}'
-  scope: resourceGroup(ResourceGroups[2]) // Management Resource Group
-  params: {
-    AutomationAccountName: AutomationAccountName
-    BeginPeakTime: ScalingBeginPeakTime
-    EndPeakTime: ScalingEndPeakTime
-    FslogixStorage: FslogixStorage
-    HostPoolName: HostPoolName
-    HostPoolResourceGroupName: ResourceGroups[2] // Management Resource Group
-    LimitSecondsToForceLogOffUser: ScalingLimitSecondsToForceLogOffUser
-    Location: Location
-    LogicAppPrefix: LogicAppPrefix
-    MinimumNumberOfRdsh: ScalingMinimumNumberOfRdsh
-    SasToken: SasToken
-    ScriptsUri: ScriptsUri    
-    SessionHostsResourceGroupName: ResourceGroups[1] // Hosts Resource Group
-    SessionThresholdPerCPU: ScalingSessionThresholdPerCPU
-    StorageAccountPrefix: StorageAccountPrefix
-    StorageResourceGroupName: ResourceGroups[3] // Hosts Resource Group
-    StorageCount: StorageCount
-    StorageIndex: StorageIndex
-    TimeDifference: ScalingTimeDifference
-  }
-  dependsOn: [
-    automationAccount
-    backup
-    sessionHosts
-  ]
-}
+
 
 // Enables drain mode on the session hosts so users cannot login
 module drainMode 'modules/drainMode.bicep' = if(DrainMode) {
