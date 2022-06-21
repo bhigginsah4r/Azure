@@ -126,40 +126,6 @@
         "description": "Choose whether the session host uses an ephemeral disk for the operating system.  Be sure to select a VM SKU that offers a temporary disk that meets your image requirements. Reference: https://docs.microsoft.com/en-us/azure/virtual-machines/ephemeral-os-disks"
       }
     },
-    "FslogixShareSizeInGB": {
-      "type": "int",
-      "metadata": {
-        "description": "The file share size(s) in GB for the Fslogix storage solution."
-      }
-    },
-    "FslogixSolution": {
-      "type": "string",
-      "defaultValue": "ProfileContainer",
-      "allowedValues": [
-        "CloudCache",
-        "ProfileContainer",
-        "ProfileOfficeContainer"
-      ]
-    },
-    "FslogixStorage": {
-      "type": "string",
-      "defaultValue": "AzureStorageAccount Standard PublicEndpoint",
-      "metadata": {
-        "description": "Enable an Fslogix storage option to manage user profiles for the AVD session hosts. The selected service & SKU should provide sufficient IOPS for all of your users. https://docs.microsoft.com/en-us/azure/architecture/example-scenario/wvd/windows-virtual-desktop-fslogix#performance-requirements"
-      },
-      "allowedValues": [
-        "AzureNetAppFiles Premium",
-        "AzureNetAppFiles Standard",
-        "AzureNetAppFiles Ultra",
-        "AzureStorageAccount Premium PublicEndpoint",
-        "AzureStorageAccount Premium PrivateEndpoint",
-        "AzureStorageAccount Premium ServiceEndpoint",
-        "AzureStorageAccount Standard PublicEndpoint",
-        "AzureStorageAccount Standard PrivateEndpoint",
-        "AzureStorageAccount Standard ServiceEndpoint",
-        "None"
-      ]
-    },
     "HostPoolType": {
       "type": "string",
       "defaultValue": "Pooled DepthFirst",
