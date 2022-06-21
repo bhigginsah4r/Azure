@@ -22,10 +22,6 @@ Param(
 
     [parameter(Mandatory)]
     [string]
-    $FSLogix,
-
-    [parameter(Mandatory)]
-    [string]
     $HostPoolName,
 
     [parameter(Mandatory)]
